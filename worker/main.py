@@ -1,12 +1,13 @@
-from lulas import Engine
+from lulas import Lulas
 import concurrent.futures
 import datetime
 import time
 
-zone = {}
-#"country_code": "PT"
-time_between_scans = 400
-lus = Engine(zone)
+filters = {}
+
+
+
+lus = Lulas(filters)
 lus.ip_to_list()
 
 
@@ -20,8 +21,14 @@ def insert_ip():
 
 
 
-print(f"_____Start this checker number of host to check : {lus.number_of_doc}")
 
 
-executor = concurrent.futures.ThreadPoolExecutor(lus.number_of_doc)
-ping_hosts = [executor.submit(lus.command, ip) for ip in lus.ip_list]
+print(lus.sys_max_threads)
+print(len(lus.ip_list))
+print(lus.sys_max_threads)
+print(lus.number_of_pool)
+
+
+with concurrent.futures.ThreadPoolExecutor(lus.sys_max_threads) as executor:
+  ping_hosts = [executor.submit(lus.command, ip) for ip in lus.ip_list]
+  

@@ -8,24 +8,27 @@ import pytz
 from pymongo import MongoClient
 
 
-class Engine:
-    def __init__(self, zone):
+class Lulas:
+    def __init__(self, filters):
         self.timezone = pytz.timezone('Europe/Paris')
-        self.filter = zone
-        self.ip_list = []
-        self.counter = 1
+        
         mongo_address = os.environ.get('MONGO_ADDRESS')
         db = os.environ.get('DB')
         collect = os.environ.get('COLLECTION')
         port = os.environ.get("PORT")
         
-
         client = MongoClient(mongo_address, int(port))
         database = client[f"{db}"]
         self.collection = database[f"{collect}"]
 
-        self.number_of_doc = self.collection.count_documents(self.filter)
-        self.finder = self.collection.find(self.filter)
+        self.ip_list = []
+        self.counter = 1
+        self.sys_max_threads = int(os.environ.get('SYS_THREAD_MAX'))
+        self.number_of_pool = 1
+        
+        self.finder = self.collection.find(filters)
+
+ 
 
     def insert_json(self, filepath):
         with open(filepath, "r") as file:
@@ -36,7 +39,12 @@ class Engine:
         list_ip = []
         for i in self.finder:
             list_ip.append(i["ip_address"])
-        self.ip_list = list_ip       
+        self.ip_list = list_ip
+
+    def display_progress(self):
+        print(f"{self.counter} / {len(self.ip_list)}")
+        self.counter += 1
+
     
     def command(self, ip):  
         try:
@@ -60,7 +68,7 @@ class Engine:
             ms_update_down = {"measures": f"{date} :down"}
             self.collection.find_one_and_update({"ip_address" : ip}, {"$set": dt}, upsert = True)
             self.collection.find_one_and_update({"ip_address" : ip}, {"$set": down}, upsert = True)
-            self.collection.find_one_and_update({"ip_address" : ip}, {"$push": ms_update_down}, upsert = True)    
+            self.collection.find_one_and_update({"ip_address" : ip}, {"$push": ms_update_down}, upsert = True)
+              
             
-        print(f"{self.counter} / {len(self.ip_list)}")
-        self.counter += 1
+        self.display_progress()
