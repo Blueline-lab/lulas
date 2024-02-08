@@ -48,6 +48,26 @@ services:
        - ./:/home
     #apt-get update && apt-get install python3 pip iputils-ping -y && pip install -r /home/requirements.txt &&
     command: sh -c "python3 /home/worker/main.py"
+
+  map:
+    #restart: always
+    image: uvicornmap:1.0.0
+    container_name: map
+    depends_on:
+    - "mongo"
+    networks:
+    - reseau_bd
+    ports:
+    - "8080:8080"
+    environment:
+    - MONGO_ADDRESS=mongodb_lulas
+    - DB=lulas
+    - COLLECTION=nameservers_ipv4_status
+    - PORT=27017
+    volumes:
+       - ./:/home
+    #apt-get update && apt-get install python3 pip iputils-ping -y && pip install -r /home/requirements.txt &&
+    command: sh -c "cd /home/map && uvicorn  main:app --host 0.0.0.0 --port 8080 --workers 1"
 networks:
   reseau_bd:
     driver: bridge
