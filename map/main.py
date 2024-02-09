@@ -3,24 +3,43 @@ import math
 import os
 import pathlib
 import sys
+import datetime
+import time
 
+import json
 import uvicorn
 import datashader as ds
 from pyarrow import csv
 import fastapi
 import pandas as pd
 from pandas.core.frame import DataFrame
+from pandas import json_normalize
 from colorcet import bmw, coolwarm, fire, CET_L18
 from datashader import transfer_functions as tf
 from datashader.utils import lnglat_to_meters
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Response, Request, Header
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from pymongo import MongoClient
+import pytz
+
 
 #from PIL import Image, ImageDraw
 from starlette.responses import FileResponse
+mongo_address = os.environ.get("MONGO_ADDRESS")
+port = os.environ.get("PORT")
+timezone = pytz.timezone('Europe/Paris')
+
+indexhtml = open('./w/index.html', 'r').read()
 
 
+def log_ip_client(date_time, ip):
+                db = "web"
+                collect = "client"
+                client = MongoClient(mongo_address, int(port))
+                database = client[f"{db}"]
+                collection = database[f"{collect}"]
+                collection.insert_one({"timestamp": date_time, "ip": ip})
 
 def tile2mercator(xtile, ytile, zoom):
     # takes the zoom and tile path and passes back the EPSG:3857
@@ -45,7 +64,7 @@ def generateatile(zoom, x, y):
     xright, yright = tile2mercator(int(x)+1, int(y)+1, int(zoom))
     condition = '(X >= {xleft}) & (X <= {xright}) & (Y <= {yleft}) & (Y >= {yright})'.format(
         xleft=xleft, yleft=yleft, xright=xright, yright=yright)
-    frame = td.query(condition)
+    frame = data.query(condition)
     # The dataframe query gets passed to Datashder to construct the graphic.
     # First the graphic is created, then the dataframe is passed to the Datashader aggregator.
     csv = ds.Canvas(plot_width=256, plot_height=256, x_range=(min(xleft, xright), max(
@@ -67,27 +86,33 @@ app = FastAPI()
 
 @app.on_event("startup")
 async def startup_event():
-    global td
-    global indexhtml
+    global data, indexhtml
 
-    # Load file
-    indexhtml = open('./w/index.html', 'r').read()
+    # Data =
+    # value, value
+    print("Loading data from file...")
+    coords = []
+    db0 = "cities"
+    collect0 = "cities_loc"
+    client = MongoClient(mongo_address, int(port))
+    database = client[f"{db0}"]
+    collection = database[f"{collect0}"]
+    all = collection.find({})
+    for i in all:
+        coords.append((float(i["lat"]), float(i["lon"])))
+    
+    
+    data = pd.DataFrame.from_records(coords, columns =['X', 'Y'])
+    print(data)
+    
+        
 
-    if pathlib.Path("data/stored.csv").exists():
-        print("Loading data from file...")
-        #td = pd.read_csv('data/stored.csv', usecols=['X', 'Y'])
-        pp = csv.read_csv('data/stored.csv')
-        td = pp.to_pandas()
-
-        #td=td.set_index(['X', 'Y'])
-    else:
-        print("There's no data/stored.csv file!  Execute ./getdata.sh first!")
-        sys.exit(1)
-
+ 
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
     return indexhtml
+
 
 @app.get("/tiles/{zoom}/{x}/{y}.png")
 async def gentile(zoom, x, y):
@@ -97,6 +122,3 @@ async def gentile(zoom, x, y):
 app.mount("/lib", StaticFiles(directory="./w/lib"), name="lib")
 app.mount("/static", StaticFiles(directory="./static"), name="static")
 
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8080)
