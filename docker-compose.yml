@@ -67,7 +67,7 @@ services:
     volumes:
        - ./:/home
     #apt-get update && apt-get install python3 pip iputils-ping -y && pip install -r /home/requirements.txt &&
-    command: sh -c "cd /home/map && uvicorn  main:app --host 0.0.0.0 --port 8080 --workers 1"
+    command: sh -c "cd /home/map && python3 main.py"
 networks:
   reseau_bd:
     driver: bridge

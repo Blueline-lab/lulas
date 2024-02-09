@@ -1,2 +1,9 @@
-pymongo
+datashader
+pyarrow
 pandas
+colorcet
+datashader
+fastapi
+starlette
+pymongo
+uvicorn
