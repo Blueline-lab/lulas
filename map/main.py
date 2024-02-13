@@ -6,6 +6,7 @@ import sys
 import datetime
 import time
 
+import pyproj
 import json
 import uvicorn
 import datashader as ds
@@ -14,7 +15,7 @@ import fastapi
 import pandas as pd
 from pandas.core.frame import DataFrame
 from pandas import json_normalize
-from colorcet import bmw, coolwarm, fire, CET_L18
+from colorcet import coolwarm
 from datashader import transfer_functions as tf
 from datashader.utils import lnglat_to_meters
 from fastapi import FastAPI, Response, Request, Header
@@ -29,8 +30,10 @@ from starlette.responses import FileResponse
 mongo_address = os.environ.get("MONGO_ADDRESS")
 port = os.environ.get("PORT")
 timezone = pytz.timezone('Europe/Paris')
-
+all_cats_colorkey = {10: 'blue', 20: 'green', 30: 'red', 40: 'orange', 50: 'purple'}
 indexhtml = open('./w/index.html', 'r').read()
+
+color_key = dict(d1='blue', d2='green', d3='red', d4='orange', d5='purple')
 
 
 def log_ip_client(date_time, ip):
@@ -70,9 +73,10 @@ def generateatile(zoom, x, y):
     csv = ds.Canvas(plot_width=256, plot_height=256, x_range=(min(xleft, xright), max(
         xleft, xright)), y_range=(min(yleft, yright), max(yleft, yright)))
     agg = csv.points(frame, 'X', 'Y')
+    
     # The image is created from the aggregate object, a color map and aggregation function.
     # Then the object is assighed to a bytestream and returned
-    img = tf.shade(agg, cmap=CET_L18, how='log')
+    img = tf.Image(tf.shade(tf.spread(agg, px=1), cmap=color_status))
     img_io = img.to_bytesio('PNG')
     img_io.seek(0)
     bytes = img_io.read()
@@ -86,24 +90,33 @@ app = FastAPI()
 
 @app.on_event("startup")
 async def startup_event():
-    global data, indexhtml
+    global data, indexhtml, color_status
 
     # Data =
     # value, value
     print("Loading data from file...")
     coords = []
-    db0 = "cities"
-    collect0 = "cities_loc"
+    color_status = []
     client = MongoClient(mongo_address, int(port))
-    database = client[f"{db0}"]
-    collection = database[f"{collect0}"]
+    database = client["lulas"]
+    collection = database["nameservers_ipv4_status"]
     all = collection.find({})
+    transformer = pyproj.Transformer.from_crs("epsg:4269", "epsg:3857")
     for i in all:
-        coords.append((float(i["lat"]), float(i["lon"])))
+        try:
+            if i["lat"] is not None:
+                element = transformer.transform(float(i["lat"]), float(i["lon"]))
+                color_status.append(i['color_status'])
+                coords.append(element)
+               
+               
+        except:
+            pass
+
     
     
     data = pd.DataFrame.from_records(coords, columns =['X', 'Y'])
-    print(data)
+   
     
         
 

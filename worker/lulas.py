@@ -6,6 +6,9 @@ import time
 import re
 import pytz
 from pymongo import MongoClient
+from colorcet import CET_I1
+
+
 
 
 class Engine:
@@ -14,6 +17,7 @@ class Engine:
         self.filter = zone
         self.ip_list = []
         self.counter = 1
+        self.color_status = CET_I1
         mongo_address = os.environ.get('MONGO_ADDRESS')
         db = os.environ.get('DB')
         collect = os.environ.get('COLLECTION')
@@ -23,6 +27,9 @@ class Engine:
         client = MongoClient(mongo_address, int(port))
         database = client[f"{db}"]
         self.collection = database[f"{collect}"]
+
+        country_db = client["cities"]
+        self.country_collection = country_db["cities_loc"]
 
         self.number_of_doc = self.collection.count_documents(self.filter)
         self.finder = self.collection.find(self.filter)
@@ -51,6 +58,27 @@ class Engine:
             self.collection.find_one_and_update({"ip_address" : ip}, {"$set": dt}, upsert = True)
             self.collection.find_one_and_update({"ip_address" : ip}, {"$set": up}, upsert = True)
             self.collection.find_one_and_update({"ip_address" : ip}, {"$push":  ms_update_up}, upsert = True)
+
+
+            color_status = ""
+            int_ms = int(ms)
+            counter = 1
+            if int_ms > len(self.color_status):
+                color_status = self.color_status[256]
+            for i in self.color_status:
+                if int_ms == counter:
+                    color_status = i
+                counter+=1
+
+
+            self.collection.find_one_and_update({"ip_address" : ip}, {"$set": {"color_status": color_status}}, upsert = True)
+
+
+            city_object = self.collection.find_one({"ip_address" : ip})
+            if city_object["city"] is not None:
+                coord_for_the_city = self.country_collection.find_one({"name": city_object["city"]})
+                self.collection.find_one_and_update({"ip_address" : ip}, {"$set": {"lat": coord_for_the_city["lat"] }}, upsert = True)
+                self.collection.find_one_and_update({"ip_address" : ip}, {"$set": {"lon": coord_for_the_city["lon"] }}, upsert = True)
            
             
         except:
@@ -60,7 +88,13 @@ class Engine:
             ms_update_down = {"measures": f"{date} :down"}
             self.collection.find_one_and_update({"ip_address" : ip}, {"$set": dt}, upsert = True)
             self.collection.find_one_and_update({"ip_address" : ip}, {"$set": down}, upsert = True)
-            self.collection.find_one_and_update({"ip_address" : ip}, {"$push": ms_update_down}, upsert = True)    
+            self.collection.find_one_and_update({"ip_address" : ip}, {"$push": ms_update_down}, upsert = True)
+            city_object = self.collection.find_one({"ip_address" : ip})
+            if city_object["city"] is not None:
+                coord_for_the_city = self.country_collection.find_one({"name": city_object["city"]})
+                self.collection.find_one_and_update({"ip_address" : ip}, {"$set": {"lat": coord_for_the_city["lat"] }}, upsert = True)
+                self.collection.find_one_and_update({"ip_address" : ip}, {"$set": {"lon": coord_for_the_city["lon"] }}, upsert = True)
+                self.collection.find_one_and_update({"ip_address" : ip}, {"$set": {"color_status": "#000000"}}, upsert = True)
             
         print(f"{self.counter} / {len(self.ip_list)}")
         self.counter += 1

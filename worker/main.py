@@ -23,5 +23,5 @@ def insert_ip():
 print(f"_____Start this checker number of host to check : {lus.number_of_doc}")
 
 
-executor = concurrent.futures.ThreadPoolExecutor(lus.number_of_doc)
+executor = concurrent.futures.ThreadPoolExecutor(4000)
 ping_hosts = [executor.submit(lus.command, ip) for ip in lus.ip_list]
