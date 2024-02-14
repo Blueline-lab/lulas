@@ -1,4 +1,4 @@
-import subprocess 
+import subprocess
 import os
 import json
 import datetime
@@ -22,7 +22,7 @@ class Engine:
         db = os.environ.get('DB')
         collect = os.environ.get('COLLECTION')
         port = os.environ.get("PORT")
-        
+
 
         client = MongoClient(mongo_address, int(port))
         database = client[f"{db}"]
@@ -43,11 +43,19 @@ class Engine:
         list_ip = []
         for i in self.finder:
             list_ip.append(i["ip_address"])
-        self.ip_list = list_ip       
-    
-    def command(self, ip):  
+        self.ip_list = list_ip
+
+    def city_positionning(self, ip):
+        city_object = self.collection.find_one({"ip_address" : ip})
+        coord_for_the_city = self.country_collection.find_one({"name": city_object["city"]})
+        if coord_for_the_city is not None:
+            self.collection.find_one_and_update({"ip_address" : ip}, {"$set": {"lat": coord_for_the_city["lat"] }}, upsert = True)
+            self.collection.find_one_and_update({"ip_address" : ip}, {"$set": {"lon": coord_for_the_city["lon"] }}, upsert = True)
+
+
+    def command(self, ip):
         try:
-            
+
             c = subprocess.check_output(["ping", "-c", "1", ip])
             icmp = c.decode("utf-8")
             date = datetime.datetime.now(tz=self.timezone).strftime("%Y-%m-%d-%H:%M")
@@ -61,10 +69,10 @@ class Engine:
 
 
             color_status = ""
-            int_ms = int(ms)
+            int_ms = int(float(ms))
             counter = 1
             if int_ms > len(self.color_status):
-                color_status = self.color_status[256]
+                color_status = self.color_status[255]
             for i in self.color_status:
                 if int_ms == counter:
                     color_status = i
@@ -73,15 +81,12 @@ class Engine:
 
             self.collection.find_one_and_update({"ip_address" : ip}, {"$set": {"color_status": color_status}}, upsert = True)
 
+            self.city_positionning(ip)
 
-            city_object = self.collection.find_one({"ip_address" : ip})
-            if city_object["city"] is not None:
-                coord_for_the_city = self.country_collection.find_one({"name": city_object["city"]})
-                self.collection.find_one_and_update({"ip_address" : ip}, {"$set": {"lat": coord_for_the_city["lat"] }}, upsert = True)
-                self.collection.find_one_and_update({"ip_address" : ip}, {"$set": {"lon": coord_for_the_city["lon"] }}, upsert = True)
-           
-            
-        except:
+
+
+        except Exception as e:
+            print(e)
             date = datetime.datetime.now(tz=self.timezone).strftime("%Y-%m-%d-%H:%M")
             dt = {"checked_at": f"{date}"}
             down = {"up/down": "down"}
@@ -95,6 +100,6 @@ class Engine:
                 self.collection.find_one_and_update({"ip_address" : ip}, {"$set": {"lat": coord_for_the_city["lat"] }}, upsert = True)
                 self.collection.find_one_and_update({"ip_address" : ip}, {"$set": {"lon": coord_for_the_city["lon"] }}, upsert = True)
                 self.collection.find_one_and_update({"ip_address" : ip}, {"$set": {"color_status": "#000000"}}, upsert = True)
-            
+
         print(f"{self.counter} / {len(self.ip_list)}")
         self.counter += 1

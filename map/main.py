@@ -124,7 +124,9 @@ async def startup_event():
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
+    print(color_status)
     return indexhtml
+
 
 
 @app.get("/tiles/{zoom}/{x}/{y}.png")
