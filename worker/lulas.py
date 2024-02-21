@@ -6,7 +6,7 @@ import time
 import re
 import pytz
 from pymongo import MongoClient
-from colorcet import CET_I1
+from colorcet import rainbow
 
 
 
@@ -17,7 +17,20 @@ class Engine:
         self.filter = zone
         self.ip_list = []
         self.counter = 1
-        self.color_status = CET_I1
+        self.color_status = rainbow
+        self.nutriscore = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"]
+        self.categories =[
+            list(range(0, 30)),
+            list(range(30, 60)),
+            list(range(60, 100)),
+            list(range(100, 150)),
+            list(range(150, 200)),
+            list(range(200, 250)),
+            list(range(250, 300)),
+            list(range(300, 400)),
+            list(range(400, 600)),
+            list(range(600, 800))]
+
         mongo_address = os.environ.get('MONGO_ADDRESS')
         db = os.environ.get('DB')
         collect = os.environ.get('COLLECTION')
@@ -33,6 +46,8 @@ class Engine:
 
         self.number_of_doc = self.collection.count_documents(self.filter)
         self.finder = self.collection.find(self.filter)
+
+
 
     def insert_json(self, filepath):
         with open(filepath, "r") as file:
@@ -70,14 +85,13 @@ class Engine:
 
             color_status = ""
             int_ms = int(float(ms))
-            counter = 1
-            if int_ms > len(self.color_status):
-                color_status = self.color_status[255]
-            for i in self.color_status:
-                if int_ms == counter:
-                    color_status = i
-                counter+=1
-
+            for c in self.categories:
+                for element in c:
+                    if int_ms == element:
+                        pos = self.categories.index(c)
+                        color_status = self.nutriscore[pos]
+            if int_ms >= 800:
+                color_status = "k"
 
             self.collection.find_one_and_update({"ip_address" : ip}, {"$set": {"color_status": color_status}}, upsert = True)
 
@@ -86,7 +100,7 @@ class Engine:
 
 
         except Exception as e:
-            print(e)
+            #print(e)
             date = datetime.datetime.now(tz=self.timezone).strftime("%Y-%m-%d-%H:%M")
             dt = {"checked_at": f"{date}"}
             down = {"up/down": "down"}
@@ -99,7 +113,7 @@ class Engine:
                 coord_for_the_city = self.country_collection.find_one({"name": city_object["city"]})
                 self.collection.find_one_and_update({"ip_address" : ip}, {"$set": {"lat": coord_for_the_city["lat"] }}, upsert = True)
                 self.collection.find_one_and_update({"ip_address" : ip}, {"$set": {"lon": coord_for_the_city["lon"] }}, upsert = True)
-                self.collection.find_one_and_update({"ip_address" : ip}, {"$set": {"color_status": "#000000"}}, upsert = True)
+            self.collection.find_one_and_update({"ip_address" : ip}, {"$set": {"color_status": "z"}}, upsert = True)
 
         print(f"{self.counter} / {len(self.ip_list)}")
         self.counter += 1

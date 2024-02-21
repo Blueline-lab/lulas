@@ -16,8 +16,8 @@ var mapdata = L.tileLayer('/tiles/{z}/{x}/{y}.png', {
         });
 
 var map = L.map('map', {
-          center: [0, 0],
-          zoom: 2,
+          center: [48.866667, 2.333333],
+          zoom: 10,
           minZoom: 1,
           maxZoom: 20,
           layers: [toner]

@@ -30,11 +30,19 @@ from starlette.responses import FileResponse
 mongo_address = os.environ.get("MONGO_ADDRESS")
 port = os.environ.get("PORT")
 timezone = pytz.timezone('Europe/Paris')
-all_cats_colorkey = {10: 'blue', 20: 'green', 30: 'red', 40: 'orange', 50: 'purple'}
+
+
 indexhtml = open('./w/index.html', 'r').read()
+color_key = dict(a='#58d68d', b='#5dade2', c='#9FE2BF', 
+d='#f4d03f', e='#f5b041', f='#FFA07A', g='#E9967A', h='#FA8072', 
+i='#CD5C5C', j='#e74c3c', k='#7f8c8d', z='black')
 
-color_key = dict(d1='blue', d2='green', d3='red', d4='orange', d5='purple')
 
+def get_data():
+    client = MongoClient(mongo_address, int(port))
+    database = client["lulas"]
+    collection = database["nameservers_ipv4_status"]
+    return collection.find({})
 
 def log_ip_client(date_time, ip):
                 db = "web"
@@ -68,15 +76,17 @@ def generateatile(zoom, x, y):
     condition = '(X >= {xleft}) & (X <= {xright}) & (Y <= {yleft}) & (Y >= {yright})'.format(
         xleft=xleft, yleft=yleft, xright=xright, yright=yright)
     frame = data.query(condition)
+   
     # The dataframe query gets passed to Datashder to construct the graphic.
     # First the graphic is created, then the dataframe is passed to the Datashader aggregator.
     csv = ds.Canvas(plot_width=256, plot_height=256, x_range=(min(xleft, xright), max(
         xleft, xright)), y_range=(min(yleft, yright), max(yleft, yright)))
-    agg = csv.points(frame, 'X', 'Y')
+    agg = csv.points(frame, 'X', 'Y', agg=ds.by("C", ds.count()))
+   
     
     # The image is created from the aggregate object, a color map and aggregation function.
     # Then the object is assighed to a bytestream and returned
-    img = tf.Image(tf.shade(tf.spread(agg, px=1), cmap=color_status))
+    img = tf.Image(tf.shade(tf.spread(agg), color_key=color_key)) # not cmap but color_key=color_key
     img_io = img.to_bytesio('PNG')
     img_io.seek(0)
     bytes = img_io.read()
@@ -90,41 +100,33 @@ app = FastAPI()
 
 @app.on_event("startup")
 async def startup_event():
-    global data, indexhtml, color_status
+    pass
+    
+    
+    
+ 
 
-    # Data =
-    # value, value
-    print("Loading data from file...")
+@app.get("/", response_class=HTMLResponse)
+async def root():
+    global data, color_status
     coords = []
-    color_status = []
-    client = MongoClient(mongo_address, int(port))
-    database = client["lulas"]
-    collection = database["nameservers_ipv4_status"]
-    all = collection.find({})
-    transformer = pyproj.Transformer.from_crs("epsg:4269", "epsg:3857")
+    all = get_data()
+    transformer = pyproj.Transformer.from_crs("epsg:4269", "epsg:3857") #à intégrer au worker
     for i in all:
         try:
             if i["lat"] is not None:
                 element = transformer.transform(float(i["lat"]), float(i["lon"]))
-                color_status.append(i['color_status'])
-                coords.append(element)
+                add_cat = element + (i['color_status'],)
+                coords.append(add_cat)
                
-               
+                
         except:
             pass
 
     
     
-    data = pd.DataFrame.from_records(coords, columns =['X', 'Y'])
-   
-    
-        
-
- 
-
-@app.get("/", response_class=HTMLResponse)
-async def root():
-    print(color_status)
+    data = pd.DataFrame.from_records(coords, columns =['X', 'Y', 'C'])
+    data['C'] = data['C'].astype("category")
     return indexhtml
 
 
