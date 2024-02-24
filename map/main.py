@@ -23,26 +23,26 @@ from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pymongo import MongoClient
 import pytz
+import charter
 
-
+all = None
 #from PIL import Image, ImageDraw
 from starlette.responses import FileResponse
 mongo_address = os.environ.get("MONGO_ADDRESS")
 port = os.environ.get("PORT")
 timezone = pytz.timezone('Europe/Paris')
 
+client = MongoClient(mongo_address, int(port))
+database = client["lulas"]
+collection = database["nameservers_ipv4_status"]
 
 indexhtml = open('./w/index.html', 'r').read()
-color_key = dict(a='#58d68d', b='#5dade2', c='#9FE2BF', 
-d='#f4d03f', e='#f5b041', f='#FFA07A', g='#E9967A', h='#FA8072', 
-i='#CD5C5C', j='#e74c3c', k='#7f8c8d', z='black')
+color_key = dict(a='#46cd10', b='#5dade2', c='#035fac', 
+d='#f4d03f', e='#f5b041', f='#FFA07A', g='#ac6203', h='#b4350c', 
+i='#7f0cb4', j='#e74c3c', k='#7f8c8d', z='black')
 
 
-def get_data():
-    client = MongoClient(mongo_address, int(port))
-    database = client["lulas"]
-    collection = database["nameservers_ipv4_status"]
-    return collection.find({})
+
 
 def log_ip_client(date_time, ip):
                 db = "web"
@@ -108,9 +108,10 @@ async def startup_event():
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    global data, color_status
+    global data, color_status, all
     coords = []
-    all = get_data()
+ 
+    all = collection.find()
     transformer = pyproj.Transformer.from_crs("epsg:4269", "epsg:3857") #à intégrer au worker
     for i in all:
         try:
@@ -135,6 +136,13 @@ async def root():
 async def gentile(zoom, x, y):
     results = generateatile(zoom, x, y)
     return Response(content=results, media_type="image/png")
+
+@app.get("/charter/{lat}/{lon}")
+async def display_chart(lat, lon):
+    for i in all:
+        print(i)
+
+    return HTMLResponse(content=charter.html, status_code=200)
 
 app.mount("/lib", StaticFiles(directory="./w/lib"), name="lib")
 app.mount("/static", StaticFiles(directory="./static"), name="static")
